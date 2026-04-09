@@ -32,7 +32,7 @@ export class App {
   }
 
   /**
-   * Procesa el código Wison para crear un nuevo analizador
+   * Procesa el codigo Wison para crear un nuevo analizador
    */
   crearAnalizador() {
     this.errores = [];
@@ -51,10 +51,10 @@ export class App {
     }
 
     try {
-      // 1. Análisis del código Wison
+      // Analisis del codigo Wison
       const datosGramatica = WisonParser.parse(this.codigoWison);
 
-      // 2. Instanciar el motor
+      // Instanciar el motor
       const nuevoMotor = new AnalizadorLL(datosGramatica);
       if (nuevoMotor.errorCompilacion.length === 0) {
         this.analizadorTemporal = nuevoMotor;
@@ -67,7 +67,7 @@ export class App {
       const esLexico = e.message.toLowerCase().includes('lexical');
       let columna = e.hash?.loc?.first_column;
 
-      // 2. Si es 0 o undefined, intentar extraerla del mensaje de texto mediante Regex
+      // Si es 0 o undefined, intentar extraerla del mensaje de texto mediante Regex
       if (columna === undefined || columna === 0) {
         // Jison suele lanzar: "Lexical error on line 13. Unrecognized text... at column 15"
         const matchCol = e.message.match(/column (\d+)/i);
@@ -121,6 +121,8 @@ export class App {
     }
   }
 
+
+  // Metodo para guardar el analizador actual en localStorage, con manejo de nombres y sobrescritura
   guardarAnalizadorPersistente() {
     if (!this.analizadorTemporal) {
       alert('Primero debe generar un analizador válido antes de guardar.');
@@ -194,7 +196,7 @@ export class App {
   }
 
   /**
-   * Función para eliminar un analizador de la persistencia
+   * Funcion para eliminar un analizador de la persistencia
    */
   eliminarAnalizador(id: number) {
     if (confirm('¿Está seguro de que desea eliminar este analizador?')) {

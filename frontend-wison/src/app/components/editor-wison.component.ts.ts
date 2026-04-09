@@ -6,7 +6,7 @@ import { CommonModule } from '@angular/common';
   selector: 'app-editor-wison',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './editor-wison.component.ts.html', // Verifica que esta ruta sea la correcta en tu proyecto
+  templateUrl: './editor-wison.component.ts.html', 
   styleUrl: './editor-wison.component.ts.scss' 
 })
 export class EditorWisonComponent implements OnChanges {
@@ -17,7 +17,7 @@ export class EditorWisonComponent implements OnChanges {
 
   lines: number[] = [1];
 
-  // 2. ESTO ES CLAVE: Detecta cuando el texto cambia desde el componente padre (ej. al cargar un archivo)
+  // Detecta cuando el texto cambia desde el componente padre (ej. al cargar un archivo)
   ngOnChanges(changes: SimpleChanges) {
     if (changes['content']) {
       this.actualizarLineas(this.content);
@@ -30,7 +30,7 @@ export class EditorWisonComponent implements OnChanges {
     this.contentChange.emit(this.content);
   }
 
-  // Función auxiliar para no repetir código
+  // Funcion auxiliar para no repetir código
   private actualizarLineas(texto: string) {
     const numLineas = (texto || '').split('\n').length;
     // Si numLineas es 0 (vacío), aseguramos que siempre haya al menos 1 línea

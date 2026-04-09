@@ -38,7 +38,7 @@ export class ArbolNodoComponent implements OnChanges {
         }
       },
       nodes: {
-        shape: 'box', // Bolitas o cajas cuadradas
+        shape: 'box', // cajas cuadradas
         font: { size: 16, face: 'monospace' },
         color: {
           background: '#e3f2fd',
