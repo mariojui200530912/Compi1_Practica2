@@ -1,0 +1,159 @@
+<div class="container-fluid py-4 bg-light min-vh-100">
+  <h2 class="text-center mb-4 text-primary">
+    <i class="bi bi-cpu"></i> Generador de Analizadores LL - Wison
+  </h2>
+
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card shadow-sm mb-4">
+        <div
+          class="card-header bg-primary text-white d-flex justify-content-between align-items-center"
+        >
+          <span><i class="bi bi-code-slash"></i> Configuración del Analizador (.wison)</span>
+          <input type="file" #fileInput (change)="cargarArchivo($event)" style="display: none" />
+          <button class="btn btn-sm btn-light" (click)="fileInput.click()">
+            <i class="bi bi-upload"></i> Cargar Archivo
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="card-body p-0" style="height: 400px">
+            <app-editor-wison
+              [(content)]="codigoWison"
+              placeholder="Wison ¿Lex {: ... :} Syntax {: ... :} ?Wison"
+            >
+            </app-editor-wison>
+          </div>
+          <div class="d-grid gap-2 mt-3">
+            <button (click)="crearAnalizador()" class="btn btn-success">
+              <i class="bi bi-gear-fill"></i> Generar Analizador
+            </button>
+          </div>
+        </div>
+      </div>
+
+      @if (errores.length > 0) {
+        <div class="card shadow-sm border-danger mt-3">
+          <div class="card-header bg-danger text-white fw-bold">
+            <i class="bi bi-bug-fill"></i> Errores de Configuración ({{ errores.length }})
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th style="width: 15%">Tipo</th>
+                  <th style="width: 65%">Mensaje</th>
+                  <th style="width: 10%">Línea</th>
+                  <th style="width: 10%">Col.</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (err of errores; track $index) {
+                  <tr>
+                    <td>
+                      <span
+                        class="badge"
+                        [ngClass]="err.tipo === 'Léxico' ? 'bg-info' : 'bg-warning text-dark'"
+                      >
+                        {{ err.tipo }}
+                      </span>
+                    </td>
+                    <td class="text-dark">
+                      <div
+                        style="
+                          white-space: pre-wrap;
+                          font-family: monospace;
+                          font-size: 0.85rem;
+                          word-break: break-all;
+                        "
+                      >
+                        {{ err.mensaje }}
+                      </div>
+                    </td>
+                    <td class="fw-bold text-center">{{ err.linea }}</td>
+                    <td class="fw-bold text-center">{{ err.columna }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm mb-4 border-success">
+        <div class="card-header bg-success text-white"><i class="bi bi-sd-card"></i> Gestión</div>
+        <div class="card-body">
+          @if (analizadorTemporal && errores.length === 0) {
+            <button
+              (click)="guardarAnalizadorPersistente()"
+              class="btn btn-outline-success w-100 mb-3"
+            >
+              <i class="bi bi-plus-circle"></i> Guardar Analizador Validado
+            </button>
+          }
+          <select class="form-select" [(ngModel)]="analizadorSeleccionado" (change)="cargarCodigoEnEditor()">
+            <option [ngValue]="null" disabled>Seleccione un analizador...</option>
+            @for (a of listaAnalizadores; track a.id) {
+              <option [ngValue]="a">{{ a.nombre }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-4 border-info">
+        <div class="card-header bg-info text-white">
+          <i class="bi bi-play-circle"></i> Editor de Entrada
+        </div>
+        <div class="card-body">
+          <div class="card-body p-0" style="height: 300px">
+            <app-editor-wison
+              [(content)]="cadenaEntrada"
+              [disabled]="!analizadorSeleccionado"
+              placeholder="Ingrese la cadena compleja aquí..."
+            >
+            </app-editor-wison>
+          </div>
+          <button
+            (click)="evaluarCadena()"
+            class="btn btn-info w-100 text-white"
+            [disabled]="!analizadorSeleccionado || !cadenaEntrada"
+          >
+            Analizar Entrada
+          </button>
+        </div>
+      </div>
+
+      @if (erroresEntrada.length > 0) {
+        <div class="card shadow-sm border-warning mb-4">
+          <div class="card-header bg-warning text-dark fw-bold">Errores en la Entrada Evaluada</div>
+          <ul class="list-group list-group-flush">
+            @for (err of erroresEntrada; track $index) {
+              <li class="list-group-item small text-danger">
+                <strong>{{ err.tipo }}:</strong> {{ err.mensaje }}
+              </li>
+            }
+          </ul>
+        </div>
+      }
+
+      @if (datosArbol) {
+        <div class="card shadow-sm border-dark animate__animated animate__fadeInUp">
+          <div
+            class="card-header bg-dark text-white d-flex justify-content-between align-items-center"
+          >
+            <span><i class="bi bi-diagram-3"></i> Árbol de Derivación Intuitivo</span>
+            <button class="btn btn-sm btn-outline-light" (click)="datosArbol = null">Cerrar</button>
+          </div>
+          <div class="card-body bg-white border" style="max-height: 500px; overflow: auto">
+            <app-arbol-nodo [nodo]="datosArbol"></app-arbol-nodo>
+          </div>
+          <div class="card-footer small text-muted">
+            <i class="bi bi-folder-fill text-warning"></i> No Terminales |
+            <i class="bi bi-tag-fill text-info"></i> Terminales
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>

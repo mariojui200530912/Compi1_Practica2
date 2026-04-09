@@ -1,0 +1,15 @@
+<div class="editor-container">
+  <div class="line-numbers" #lineNumbers>
+    @for (line of lines; track $index) {
+      <span>{{ $index + 1 }}</span>
+    }
+  </div>
+  <textarea
+    [(ngModel)]="content"
+    (ngModelChange)="onContentChange($event)"
+    (scroll)="syncScroll($event, lineNumbers)"
+    [placeholder]="placeholder"
+    [disabled]="disabled"
+    spellcheck="false"
+  ></textarea>
+</div>
