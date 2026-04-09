@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 // @ts-ignore
 import * as WisonParser from './logic/jison-parser';
 import { AnalizadorLL } from './logic/analizador-ll'; // Asegúrate de la ruta
-import { ErrorCompilacion } from './logic/models/models';
+import { ErrorCompilacion, transformarParaVis } from './logic/models/models';
 import { ArbolNodoComponent } from './components/arbol-nodo.component';
 import { EditorWisonComponent } from './components/editor-wison.component.ts';
 
@@ -55,22 +55,14 @@ export class App {
       const datosGramatica = WisonParser.parse(this.codigoWison);
 
       // 2. Instanciar el motor
-      const nuevoMotor = new AnalizadorLL();
-      nuevoMotor.terminales = [...datosGramatica.terminales];
-      nuevoMotor.noTerminales = [...datosGramatica.noTerminales];
-      nuevoMotor.producciones = [...datosGramatica.producciones];
-      nuevoMotor.simboloInicial = datosGramatica.inicio;
-
-      // 3. Validar gramática (Recursividad, Ambigüedad, etc.)
-
-      if (nuevoMotor.validarGramatica()) {
-        // Guardamos en el temporal para habilitar el botón de "Guardar"
+      const nuevoMotor = new AnalizadorLL(datosGramatica);
+      if (nuevoMotor.errorCompilacion.length === 0) {
         this.analizadorTemporal = nuevoMotor;
-        alert('Gramática procesada correctamente. Ya puede guardarla.');
+        alert('Gramática procesada y validada correctamente. Ya puede guardarla.');
       } else {
-        // Si hay errores de validación (ej. Colisiones en tabla LL)
         this.errores = nuevoMotor.errorCompilacion;
       }
+
     } catch (e: any) {
       const esLexico = e.message.toLowerCase().includes('lexical');
       let columna = e.hash?.loc?.first_column;
@@ -101,7 +93,7 @@ export class App {
   }
 
   /**
-   * Evalúa una cadena usando el analizador seleccionado
+   * Evalua una cadena usando el analizador seleccionado
    */
   evaluarCadena() {
     this.erroresEntrada = [];
@@ -119,8 +111,7 @@ export class App {
       const resultadoRaiz = motor.analizar(tokens);
 
       if (resultadoRaiz) {
-        // PASAMOS EL OBJETO NodoArbol PURO, SIN TRANSFORMAR
-        this.datosArbol = resultadoRaiz;
+        this.datosArbol = transformarParaVis(resultadoRaiz);
       }
     } catch (e: any) {
       this.erroresEntrada.push({
@@ -233,16 +224,16 @@ export class App {
     this.listaAnalizadores = guardados
       .map((data: any) => {
         try {
-          const motor = new AnalizadorLL();
+          const datosParaMotor = {
+            terminales: data.terminales || [],
+            noTerminales: data.noTerminales || [],
+            producciones: data.producciones || [],
+            inicio: data.simboloInicial || '' 
+          };
 
-          // Pasamos los datos directamente desde el disco (Cero Jison)
-          motor.terminales = data.terminales || [];
-          motor.noTerminales = data.noTerminales || [];
-          motor.producciones = data.producciones || [];
-          motor.simboloInicial = data.simboloInicial || '';
-
+          const motor = new AnalizadorLL(datosParaMotor);
           // Validamos para reconstruir la tabla LL(1) internamente
-          if (motor.validarGramatica()) {
+          if (motor.errorCompilacion.length === 0) {
             return {
               id: data.id,
               nombre: data.nombre,
@@ -250,6 +241,7 @@ export class App {
               config: data.configWison,
             };
           } else {
+            console.warn(`El analizador guardado '${data.nombre}' ya no es válido.`);
             return null;
           }
         } catch (e) {

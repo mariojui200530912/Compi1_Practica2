@@ -6,24 +6,36 @@ export class AnalizadorLL {
   public producciones: Produccion[] = [];
   public simboloInicial: string = '';
   public errorCompilacion: ErrorCompilacion[] = [];
-  private tokens: string[] = []; // La entrada ya tokenizada (ej: ["$_Una_A", "$_Mas", "$_Una_A"])
+  private tokens: {nombre: string, valor: string}[] = [];
   private indiceActual: number = 0;
   private tablaParsing: Map<string, Map<string, Produccion>> = new Map();
 
-  constructor() {}
+  constructor(datosGramatica?: any) {
+    if (datosGramatica) {
+      this.terminales = datosGramatica.terminales || [];
+      this.noTerminales = datosGramatica.noTerminales || [];
+      this.producciones = datosGramatica.producciones || [];
+      this.simboloInicial = datosGramatica.inicio || '';
 
-  // Aquí implementarás la validación LL(1)
+      // Inmediatamente validamos la semantica y generamos la tabla
+      this.validarGramatica();
+    }
+  }
+
   public validarGramatica(): boolean {
     this.errorCompilacion = []; // Limpiar errores anteriores
     try {
-      // 1. Verificar recursividad por la izquierda directa [cite: 15]
+      this.validarSemantica();
+      // Verificar recursividad por la izquierda directa
       for (const p of this.producciones) {
         if (p.izquierda === p.derecha[0]) {
-          throw new Error(`Recursividad izquierda detectada en: ${p.izquierda}`);
+          throw new Error(
+            `Error Semántico: Recursividad por la izquierda detectada en: ${p.izquierda} -> ${p.derecha.join(' ')}`,
+          );
         }
       }
 
-      // 2. Intentar generar la tabla (detecta colisiones/ambigüedad) [cite: 14, 17]
+      // Generar la tabla (detecta colisiones/ambigüedad)
       this.generarTablaParsing();
 
       return true;
@@ -39,8 +51,43 @@ export class AnalizadorLL {
     }
   }
 
-  // Función para obtener el conjunto FIRST de un símbolo
-  public obtenerFirst(simbolo: string): Set<string> {
+  private validarSemantica() {
+    const nombresNoTerminales = this.noTerminales.map((nt) => nt.nombre);
+    const nombresTerminales = this.terminales.map((t) => t.nombre);
+
+    if (!nombresNoTerminales.includes(this.simboloInicial)) {
+      throw new Error(`El Initial_Sim '${this.simboloInicial}' no fue declarado como No_Terminal.`);
+    }
+
+    this.noTerminales.forEach((nt) => {
+      const tieneRegla = this.producciones.some((p) => p.izquierda === nt.nombre);
+      if (!tieneRegla) {
+        throw new Error(
+          `El No_Terminal '${nt.nombre}' fue declarado, pero no tiene ninguna producción asignada.`,
+        );
+      }
+    });
+
+    this.producciones.forEach((prod) => {
+      prod.derecha.forEach((simbolo) => {
+        if (simbolo !== 'EPSILON') {
+          const existeTerminal = nombresTerminales.includes(simbolo);
+          const existeNoTerminal = nombresNoTerminales.includes(simbolo);
+          if (!existeTerminal && !existeNoTerminal) {
+            const err: any = new Error(
+              `El símbolo '${simbolo}' usado en la producción de '${prod.izquierda}' NO ha sido declarado previamente.`,
+            );
+            err.linea = prod.fila;
+            err.columna = prod.columna;
+            throw err;
+          }
+        }
+      });
+    });
+  }
+
+  // Funcion para obtener el conjunto FIRST de un simbolo
+  public obtenerFirst(simbolo: string, visitados: Set<string> = new Set()): Set<string> {
     let firsts: Set<string> = new Set();
 
     if (simbolo === 'EPSILON') {
@@ -53,103 +100,113 @@ export class AnalizadorLL {
       return firsts;
     }
 
-    const produccionesDeS = this.producciones.filter((p) => p.izquierda === simbolo);
+    // Evita bucles como A -> B, B -> A
+    if (visitados.has(simbolo)) return firsts; 
+    visitados.add(simbolo);
+
+    const produccionesDeS = this.producciones.filter(p => p.izquierda === simbolo);
 
     for (const p of produccionesDeS) {
       for (let i = 0; i < p.derecha.length; i++) {
-        const currentFirsts = this.obtenerFirst(p.derecha[i]);
+        // Pasamos el set de visitados para evitar ciclos
+        const currentFirsts = this.obtenerFirst(p.derecha[i], new Set(visitados));
 
-        // Agregamos todo lo que no sea EPSILON
         currentFirsts.forEach((f) => {
           if (f !== 'EPSILON') firsts.add(f);
         });
 
-        // Si el símbolo actual NO produce EPSILON, nos detenemos
         if (!currentFirsts.has('EPSILON')) break;
-
-        // Si llegamos al final y todos producen EPSILON, el No Terminal produce EPSILON
         if (i === p.derecha.length - 1) firsts.add('EPSILON');
       }
     }
     return firsts;
   }
 
-  public obtenerFollow(noTerminal: string): Set<string> {
+  public obtenerFollow(noTerminal: string, visitados: Set<string> = new Set()): Set<string> {
     let follows: Set<string> = new Set();
 
-    // 1. Si es el símbolo inicial, agregamos el fin de cadena ($ o $_FIN)
     if (noTerminal === this.simboloInicial) {
-      follows.add('$_FIN');
+      follows.add('EOF');
     }
 
-    // 2. Buscamos todas las producciones donde 'noTerminal' esté en la parte DERECHA
-    for (const p of this.producciones) {
-      const index = p.derecha.indexOf(noTerminal);
+    if (visitados.has(noTerminal)) return follows;
+    visitados.add(noTerminal);
 
-      if (index !== -1) {
-        // Si hay algo después del símbolo: A -> α B β
+    for (const p of this.producciones) {
+      // Buscar TODAS las ocurrencias del noTerminal en la parte derecha
+      const indices = [];
+      for(let i=0; i<p.derecha.length; i++) {
+          if (p.derecha[i] === noTerminal) indices.push(i);
+      }
+
+      for (const index of indices) {
         if (index < p.derecha.length - 1) {
-          const siguiente = p.derecha[index + 1];
-          const firstSiguiente = this.obtenerFirst(siguiente);
-          firstSiguiente.forEach((f) => follows.add(f));
-        }
-        // Si no hay nada después: A -> α B, el FOLLOW(B) contiene FOLLOW(A)
+          // Extraemos el subarreglo que sigue al noTerminal
+          const cadenaSiguiente = p.derecha.slice(index + 1);
+          const firstSiguiente = this.obtenerFirstDeCadena(cadenaSiguiente);
+          
+          firstSiguiente.forEach(f => {
+            if (f !== 'EPSILON') follows.add(f);
+          });
+
+          // Si el FIRST de todo lo que sigue tiene EPSILON, agregamos el FOLLOW de la izquierda
+          if (firstSiguiente.has('EPSILON') && p.izquierda !== noTerminal) {
+            const followIzquierda = this.obtenerFollow(p.izquierda, visitados);
+            followIzquierda.forEach(f => follows.add(f));
+          }
+        } 
         else if (p.izquierda !== noTerminal) {
-          const followIzquierda = this.obtenerFollow(p.izquierda);
-          followIzquierda.forEach((f) => follows.add(f));
+          const followIzquierda = this.obtenerFollow(p.izquierda, visitados);
+          followIzquierda.forEach(f => follows.add(f));
         }
       }
     }
     return follows;
   }
 
-  public analizar(entradaTokenizada: string[]): NodoArbol | null {
-    this.tokens = [...entradaTokenizada, '$_FIN']; // Agregamos fin de cadena [cite: 34]
+  public analizar(entradaTokenizada: {nombre: string, valor: string}[]): NodoArbol | null {
+    this.tokens = [...entradaTokenizada, { nombre: 'EOF', valor: 'EOF' }];
     this.indiceActual = 0;
 
     try {
-      // Iniciamos la recursión con el símbolo inicial [cite: 12, 44]
       const raiz = this.parseSimbolo(this.simboloInicial);
 
-      // Si después de la recursión no consumimos todo, hay error
-      if (this.tokens[this.indiceActual] !== '$_FIN') {
-        throw new Error('Error: No se consumió toda la entrada');
+      if (this.tokens[this.indiceActual].nombre !== 'EOF') {
+        throw new Error(`Error Sintáctico: Análisis finalizado prematuramente. Token no consumido: ${this.tokens[this.indiceActual]}`);
       }
 
       return raiz;
-    } catch (error) {
-      console.error(error);
-      return null; // Retorna null si la cadena no es aceptada [cite: 26]
+    } catch (error: any) {
+      throw error; // Lanza el error para que app.ts lo atrape en evaluarCadena
     }
   }
 
   /**
-   * Función recursiva principal que decide qué camino tomar
+   * Funcion recursiva principal que decide que camino tomar
    */
   private parseSimbolo(simbolo: string): NodoArbol {
     const nodo = new NodoArbol(simbolo, this.esTerminal(simbolo));
     const tokenActual = this.tokens[this.indiceActual];
 
-    // CASO 1: El símbolo es un TERMINAL
     if (this.esTerminal(simbolo)) {
-      if (simbolo === tokenActual) {
-        this.indiceActual++; // Consumimos el token
+      if (simbolo === tokenActual.nombre) {
+        if (simbolo !== 'EOF' && simbolo !== 'EPSILON') {
+          nodo.valor = `${simbolo}\n"${tokenActual.valor}"`; 
+        }
+        this.indiceActual++; 
         return nodo;
       } else {
-        throw new Error(`Error Sintáctico: Se esperaba ${simbolo} pero se encontró ${tokenActual}`);
+        throw new Error(`Error Sintáctico: Se esperaba '${simbolo}' pero se encontró '${tokenActual}'.`);
       }
     }
 
-    // CASO 2: El símbolo es un NO TERMINAL
-    // Buscamos en la tabla LL(1) qué producción usar [cite: 10, 12]
     const produccionesParaNoTerminal = this.tablaParsing.get(simbolo);
-    const produccionAEjecutar = produccionesParaNoTerminal?.get(tokenActual);
+    const produccionAEjecutar = produccionesParaNoTerminal?.get(tokenActual.nombre);
 
     if (!produccionAEjecutar) {
-      throw new Error(`Error Sintáctico: No hay regla para (${simbolo}, ${tokenActual})`);
+      throw new Error(`Error Sintáctico en token '${tokenActual}': No hay regla LL(1) para el símbolo (${simbolo}).`);
     }
 
-    // Aplicamos la producción: expandimos sus hijos recursivamente [cite: 11]
     for (const simboloHijo of produccionAEjecutar.derecha) {
       if (simboloHijo === 'EPSILON') {
         nodo.agregarHijo(new NodoArbol('ε', true));
@@ -163,26 +220,22 @@ export class AnalizadorLL {
   }
 
   private esTerminal(s: string): boolean {
-    return s.startsWith('$_');
+    return s.startsWith('$_') || s === 'EOF';
   }
 
   public generarTablaParsing(): void {
     this.tablaParsing.clear();
-    this.errorCompilacion = [];
 
     for (const p of this.producciones) {
       const firstsDerecha = this.obtenerFirstDeCadena(p.derecha);
 
-      // Regla 1: Para cada t en FIRST(derecha), si t != EPSILON
-      firstsDerecha.forEach((t) => {
+      firstsDerecha.forEach(t => {
         if (t !== 'EPSILON') this.agregarATabla(p.izquierda, t, p);
       });
 
-      // Regla 2: Si EPSILON está en FIRST(derecha),
-      // agregar la producción para cada t en FOLLOW(izquierda)
       if (firstsDerecha.has('EPSILON')) {
         const follows = this.obtenerFollow(p.izquierda);
-        follows.forEach((t) => {
+        follows.forEach(t => {
           this.agregarATabla(p.izquierda, t, p);
         });
       }
@@ -196,21 +249,16 @@ export class AnalizadorLL {
 
     const fila = this.tablaParsing.get(noTerminal)!;
 
-    // VALIDACIÓN DE COLISIONES
     if (fila.has(terminal)) {
       const pExistente = fila.get(terminal)!;
-
-      // Construimos una representación visual de las reglas
       const reglaNueva = `${produccion.izquierda} -> ${produccion.derecha.join(' ')}`;
       const reglaVieja = `${pExistente.izquierda} -> ${pExistente.derecha.join(' ')}`;
 
-      const mensaje =
-        `Colisión LL(1) en [${noTerminal}, ${terminal}].\n` +
-        `Regla A: (${reglaNueva}) en línea ${produccion.fila}\n` +
-        `Regla B: (${reglaVieja}) en línea ${pExistente.fila}\n` +
-        `Sugerencia: Revisa si hay ambigüedad o necesitas factorizar por la izquierda.`;
-
-      const error: any = new Error(mensaje);
+      const error: any = new Error(
+        `Ambigüedad LL(1) detectada en casilla [${noTerminal}, ${terminal}].\n` +
+        `- Regla A: ${reglaNueva}\n` +
+        `- Regla B: ${reglaVieja}`
+      );
       error.linea = produccion.fila;
       error.columna = produccion.columna;
       throw error;
@@ -219,20 +267,17 @@ export class AnalizadorLL {
     fila.set(terminal, produccion);
   }
 
-  public generarTokens(textoEntrada: string): string[] {
-    let tokensEncontrados: string[] = [];
+  public generarTokens(textoEntrada: string): {nombre: string, valor: string}[] {
+    let tokensEncontrados: {nombre: string, valor: string}[] = [];
     let lineas = textoEntrada.split('\n');
 
-    const terminalesOrdenados = [...this.terminales].sort(
-      (a, b) => b.regex.length - a.regex.length,
-    );
+    const terminalesOrdenados = [...this.terminales].sort((a, b) => b.regex.length - a.regex.length);
 
     for (let i = 0; i < lineas.length; i++) {
       let lineaActual = lineas[i];
       let columnaLocal = 1;
 
       while (lineaActual.length > 0) {
-        // Ignorar espacios, tabs, etc.
         const espacioMatch = lineaActual.match(/^[\s\t]+/);
         if (espacioMatch) {
           columnaLocal += espacioMatch[0].length;
@@ -243,13 +288,10 @@ export class AnalizadorLL {
         let coincidencia = false;
 
         for (const term of terminalesOrdenados) {
-          // Limpiar el patrón para obtener una regex válida
           let rawPattern = term.regex;
 
-          // Si el patrón está envuelto en comillas simples, extraemos el contenido interno
           if (rawPattern.startsWith("'") && rawPattern.endsWith("'")) {
             rawPattern = rawPattern.slice(1, -1);
-            // Escapamos caracteres especiales SOLO para literales (para que '+' coincida con el carácter '+')
             rawPattern = rawPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           }
 
@@ -257,21 +299,19 @@ export class AnalizadorLL {
             const regex = new RegExp('^(' + rawPattern + ')');
             const match = lineaActual.match(regex);
             if (match) {
-              tokensEncontrados.push(term.nombre);
+              tokensEncontrados.push({ nombre: term.nombre, valor: match[0] });
               lineaActual = lineaActual.substring(match[0].length);
               columnaLocal += match[0].length;
               coincidencia = true;
               break;
             }
           } catch (e) {
-            console.warn(`Regex inválida para terminal ${term.nombre}: ${rawPattern}`, e);
+            console.warn(`Regex inválida para terminal ${term.nombre}`);
           }
         }
 
         if (!coincidencia) {
-          throw new Error(
-            `Error Léxico en Línea ${i + 1}, Columna ${columnaLocal}: Carácter "${lineaActual[0]}" (código ${lineaActual.charCodeAt(0)}) no reconocido.`,
-          );
+          throw new Error(`Error Léxico en Línea ${i + 1}, Col. ${columnaLocal}: Carácter "${lineaActual[0]}" no reconocido.`);
         }
       }
     }
@@ -282,7 +322,7 @@ export class AnalizadorLL {
     let res = new Set<string>();
     for (const s of cadena) {
       const f = this.obtenerFirst(s);
-      f.forEach((x) => {
+      f.forEach(x => {
         if (x !== 'EPSILON') res.add(x);
       });
       if (!f.has('EPSILON')) return res;

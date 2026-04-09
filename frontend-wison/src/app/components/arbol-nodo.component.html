@@ -1,17 +1,1 @@
-<div class="ms-4 border-start ps-2">
-  <div class="d-flex align-items-center my-1">
-    <i
-      class="bi"
-      [ngClass]="esTerminal(nodo.valor) ? 'bi-tag-fill text-info' : 'bi-folder-fill text-warning'"
-    ></i>
-    <span class="ms-2 fw-semibold" [class.text-primary]="!esTerminal(nodo.valor)">
-      {{ nodo.valor }}
-    </span>
-  </div>
-
-  @if (nodo.hijos && nodo.hijos.length > 0) {
-    @for (hijo of nodo.hijos; track $index) {
-      <app-arbol-nodo [nodo]="hijo"></app-arbol-nodo>
-    }
-  }
-</div>
+<div #grafoContainer style="width: 100%; height: 500px; background-color: #ffffff;"></div>

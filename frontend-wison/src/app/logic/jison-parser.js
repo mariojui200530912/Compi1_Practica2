@@ -630,7 +630,7 @@ case 0:/* Ignorar saltos, tabs y espacios [REQUISITO] */
 break;
 case 1:/* Comentario de línea simple */ 
 break;
-case 2:/* Comentario de bloque multilínea  */ 
+case 2:/* Comentario de bloque multilinea  */ 
 break;
 case 3:return 5;
 break;
@@ -668,9 +668,9 @@ case 19:return 16;   /* REQUISITO: Inician con $_ */
 break;
 case 20:return 33; /* REQUISITO: Inician con %_ */
 break;
-case 21:return 20;       /* REQUISITO: Comillas simples */
+case 21:return 20;       
 break;
-case 22:return 21;         /* REQUISITO: Solo estos dos rangos */
+case 22:return 21;         
 break;
 case 23:return 22;
 break;

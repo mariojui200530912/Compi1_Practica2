@@ -1,4 +1,4 @@
-/* Código inicial */
+/* Codigo inicial */
 %{
     const { Terminal, NoTerminal, Produccion } = require('./models/models');
     
@@ -11,7 +11,7 @@
 
 \s+                         /* Ignorar saltos, tabs y espacios [REQUISITO] */ 
 "#".*                       /* Comentario de línea simple */ 
-"/**"[\s\S]*?"*/"           /* Comentario de bloque multilínea  */ 
+"/**"[\s\S]*?"*/"           /* Comentario de bloque multilinea  */ 
 
 /* Palabras Reservadas */
 "Wison"                     return 'RW_WISON';
@@ -38,8 +38,8 @@
 "%_"[a-zA-Z0-9_]+           return 'ID_NOTERMINAL'; /* REQUISITO: Inician con %_ */
 
 /* Expresiones Regulares */
-"'"[^']*"'"                 return 'LITERAL';       /* REQUISITO: Comillas simples */
-"[aA-zZ]"|"[0-9]"           return 'RANGE';         /* REQUISITO: Solo estos dos rangos */
+"'"[^']*"'"                 return 'LITERAL';       
+"[aA-zZ]"|"[0-9]"           return 'RANGE';         
 "*"                         return 'STAR';
 "+"                         return 'PLUS';
 "?"                         return 'QUESTION';

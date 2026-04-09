@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 
@@ -6,47 +6,10 @@ import { CommonModule } from '@angular/common';
   selector: 'app-editor-wison',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  templateUrl: './editor-wison.component.ts.html',
-  styles: [`
-    .editor-container {
-      display: flex;
-      height: 100%;
-      border: 1px solid #ced4da;
-      border-radius: 4px;
-      overflow: hidden;
-      background: #212529; /* Fondo oscuro tipo VS Code */
-    }
-    .line-numbers {
-      width: 40px;
-      padding: 10px 0;
-      background: #1a1d20;
-      color: #6c757d;
-      text-align: right;
-      padding-right: 8px;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 14px;
-      line-height: 21px; /* Debe coincidir exactamente con el textarea */
-      user-select: none;
-      overflow: hidden;
-    }
-    .line-numbers span { display: block; }
-    textarea {
-      flex: 1;
-      border: none;
-      background: transparent;
-      color: #74ccf4; /* Color cyan para el código */
-      padding: 10px;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 14px;
-      line-height: 21px;
-      resize: none;
-      outline: none;
-      white-space: pre;
-      overflow: auto;
-    }
-  `]
+  templateUrl: './editor-wison.component.ts.html', // Verifica que esta ruta sea la correcta en tu proyecto
+  styleUrl: './editor-wison.component.ts.scss' 
 })
-export class EditorWisonComponent {
+export class EditorWisonComponent implements OnChanges {
   @Input() content: string = '';
   @Input() placeholder: string = '';
   @Input() disabled: boolean = false;
@@ -54,10 +17,24 @@ export class EditorWisonComponent {
 
   lines: number[] = [1];
 
+  // 2. ESTO ES CLAVE: Detecta cuando el texto cambia desde el componente padre (ej. al cargar un archivo)
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['content']) {
+      this.actualizarLineas(this.content);
+    }
+  }
+
   onContentChange(value: string) {
     this.content = value;
-    this.lines = value.split('\n').map((_, i) => i + 1);
+    this.actualizarLineas(value);
     this.contentChange.emit(this.content);
+  }
+
+  // Función auxiliar para no repetir código
+  private actualizarLineas(texto: string) {
+    const numLineas = (texto || '').split('\n').length;
+    // Si numLineas es 0 (vacío), aseguramos que siempre haya al menos 1 línea
+    this.lines = Array.from({ length: Math.max(1, numLineas) }, (_, i) => i + 1);
   }
 
   syncScroll(event: any, lineNumbers: HTMLElement) {
